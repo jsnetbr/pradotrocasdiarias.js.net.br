@@ -1,0 +1,30 @@
+{
+  "entities": {
+    "sector": {
+      "title": "Setor",
+      "description": "Dados de performance de um setor específico em uma data.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "setor": { "type": "string" },
+        "realizado": { "type": "number" },
+        "meta": { "type": "number" },
+        "status": { "type": "number" },
+        "isCritical": { "type": "boolean" },
+        "isBest": { "type": "boolean" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "setor", "realizado", "meta", "status"]
+    }
+  },
+  "firestore": {
+    "/reports/{dateId}/sectors/{sectorId}": {
+      "schema": "sector",
+      "description": "Performance diária por setor."
+    },
+    "/config/master_sectors/sectors/{sectorId}": {
+      "schema": "sector",
+      "description": "Metas mestres globais para todos os dias."
+    }
+  }
+}

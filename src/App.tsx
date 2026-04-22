@@ -1,0 +1,263 @@
+import React, { useState, useEffect } from 'react';
+import { Calendar, RotateCcw, Download, ThumbsUp, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { KpiCard } from './components/KpiCard';
+import { DepartmentTable } from './components/DepartmentTable';
+import { departmentData as initialData } from './data';
+import { db } from './lib/firebase';
+import { collection, doc, onSnapshot, setDoc, writeBatch, query, getDocs } from 'firebase/firestore';
+import { DepartmentData } from './types';
+
+export default function App() {
+  const [data, setData] = useState<DepartmentData[]>([]);
+  const [currentDate, setCurrentDate] = useState(new Date().toISOString().split('T')[0]);
+  const [showToast, setShowToast] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(value);
+  };
+
+  const formatPercentage = (value: number) => {
+    return value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
+  };
+
+  // Dual Sync Effect: Master Metas + Daily Realizados
+  useEffect(() => {
+    setIsLoading(true);
+    
+    // 1. References
+    const masterSectorsRef = collection(db, 'config', 'master_sectors', 'sectors');
+    const dailySectorsRef = collection(db, 'reports', currentDate, 'sectors');
+
+    let masterList: any[] = [];
+    let dailyList: any[] = [];
+
+    const combineData = () => {
+      // Use initialData as the skeleton for names and IDs
+      const combined = initialData.map(base => {
+        const master = masterList.find(m => m.id === base.id);
+        const daily = dailyList.find(d => d.id === base.id);
+        
+        const meta = master?.meta ?? base.meta;
+        const realizado = daily?.realizado ?? 0;
+        const status = meta > 0 ? (realizado / meta) * 100 : 0;
+        
+        return {
+          ...base,
+          meta,
+          realizado,
+          status,
+          updatedAt: daily?.updatedAt || master?.updatedAt || new Date().toISOString()
+        };
+      });
+      setData(combined);
+      setIsLoading(false);
+    };
+
+    // 2. Listen to Master Metas
+    const unsubMaster = onSnapshot(masterSectorsRef, (snapshot) => {
+      if (snapshot.empty) {
+        // First time initialization of Master Metas
+        const batch = writeBatch(db);
+        initialData.forEach(item => {
+          const docRef = doc(masterSectorsRef, item.id);
+          batch.set(docRef, { id: item.id, setor: item.setor, meta: item.meta });
+        });
+        batch.commit();
+      } else {
+        masterList = snapshot.docs.map(doc => doc.data());
+        combineData();
+      }
+    });
+
+    // 3. Listen to Daily Realizados
+    const unsubDaily = onSnapshot(dailySectorsRef, (snapshot) => {
+      dailyList = snapshot.docs.map(doc => doc.data());
+      combineData();
+    });
+
+    return () => {
+      unsubMaster();
+      unsubDaily();
+    };
+  }, [currentDate]);
+
+  const handleUpdate = async (id: string, updates: Partial<DepartmentData>) => {
+    try {
+      if (updates.meta !== undefined) {
+        // Update Global Meta
+        const masterDocRef = doc(db, 'config', 'master_sectors', 'sectors', id);
+        await setDoc(masterDocRef, { meta: updates.meta }, { merge: true });
+      }
+      
+      if (updates.realizado !== undefined) {
+        // Update Daily Realizado
+        const dailyDocRef = doc(db, 'reports', currentDate, 'sectors', id);
+        await setDoc(dailyDocRef, { 
+          id, 
+          realizado: updates.realizado, 
+          updatedAt: new Date().toISOString() 
+        }, { merge: true });
+      }
+      
+      triggerToast('Dados sincronizados!');
+    } catch (error) {
+      console.error("Erro ao salvar:", error);
+    }
+  };
+
+  const handleReset = async () => {
+    const batch = writeBatch(db);
+    data.forEach((item) => {
+      const docRef = doc(db, 'reports', currentDate, 'sectors', item.id);
+      batch.set(docRef, { id: item.id, realizado: 0, updatedAt: new Date().toISOString() }, { merge: true });
+    });
+    await batch.commit();
+    triggerToast('Valores zerados para este dia!');
+  };
+
+  const triggerToast = (message: string) => {
+    setShowToast(message);
+    setTimeout(() => setShowToast(null), 3000);
+  };
+
+  const handleExport = () => {
+    const headers = ['Setor', 'Realizado', 'Meta', 'Status'];
+    const rows = data.map(item => [
+      item.setor,
+      item.realizado.toString().replace('.', ','),
+      item.meta.toString().replace('.', ','),
+      item.status.toString().replace('.', ',') + '%'
+    ]);
+
+    const csvContent = [
+      headers.join(';'),
+      ...rows.map(e => e.join(';'))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `relatorio_trocas_${currentDate}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    triggerToast('Relatório exportado!');
+  };
+
+  // Calculate totals
+  const totalRealized = data.reduce((acc, curr) => acc + curr.realizado, 0);
+  const totalGoal = data.reduce((acc, curr) => acc + curr.meta, 0);
+  const totalVariance = totalRealized - totalGoal;
+  const variancePercentage = totalGoal > 0 ? (totalVariance / totalGoal) * 100 : 0;
+
+  const bestSector = data.length > 0 ? [...data].sort((a, b) => b.status - a.status)[0] : null;
+  const worstSector = data.length > 0 ? [...data].sort((a, b) => a.status - b.status)[0] : null;
+
+  return (
+    <div className="min-h-screen p-4 md:p-8 max-w-[1400px] mx-auto space-y-8 text-white relative">
+      <div className="bg-blur" />
+      
+      <AnimatePresence>
+        {showToast && (
+          <motion.div
+            initial={{ opacity: 0, y: -50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="fixed top-8 left-1/2 -translate-x-1/2 z-50 glass px-6 py-3 rounded-full flex items-center gap-3 border-white/20 shadow-2xl"
+          >
+            <CheckCircle2 className="w-5 h-5 text-green-400" />
+            <span className="text-sm font-medium">{showToast}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-10 relative z-10">
+        <div>
+          <h1 className="text-3xl md:text-4xl font-bold text-white tracking-tight drop-shadow-sm">
+            Relatório de Troca Diário
+          </h1>
+          {isLoading && (
+            <div className="flex items-center gap-2 mt-2 text-white/40 text-xs text-cyan-400">
+              <Loader2 className="w-3 h-3 animate-spin" />
+              Sincronizando...
+            </div>
+          )}
+        </div>
+        
+        <div className="flex items-center gap-3">
+          <div className="glass rounded-lg px-3 py-2 flex items-center gap-3 shadow-sm border-white/10 group cursor-pointer hover:bg-white/15 transition-colors relative">
+            <Calendar className="w-4 h-4 text-white/60 group-hover:text-white transition-colors pointer-events-none" />
+            <input 
+              type="date" 
+              value={currentDate} 
+              onChange={(e) => setCurrentDate(e.target.value)}
+              className="bg-transparent border-none text-sm font-medium text-white/80 focus:ring-0 w-32 cursor-pointer outline-none [color-scheme:dark]"
+            />
+          </div>
+
+          <button 
+            onClick={handleReset}
+            disabled={isLoading}
+            className="bg-white/10 hover:bg-white/20 text-white rounded-lg px-4 py-2 text-sm font-semibold flex items-center gap-2 shadow-sm transition-all active:scale-95 border border-white/10 backdrop-blur-md disabled:opacity-50"
+          >
+            <RotateCcw className="w-4 h-4" />
+            Zerar Realizados
+          </button>
+
+          <button 
+            onClick={handleExport}
+            disabled={isLoading}
+            className="bg-white/80 hover:bg-white text-slate-900 rounded-lg px-4 py-2 text-sm font-semibold flex items-center gap-2 shadow-sm transition-all active:scale-95 border border-white/20 backdrop-blur-md disabled:opacity-50"
+          >
+            <Download className="w-4 h-4" />
+            Exportar
+          </button>
+        </div>
+      </header>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 relative z-10">
+        <KpiCard title="Total Realizado" value={formatCurrency(totalRealized)} delay={0.1} />
+        <KpiCard title="Meta Total" value={formatCurrency(totalGoal)} delay={0.2} />
+        <KpiCard 
+          title="Variação Total" 
+          value={formatCurrency(totalVariance)} 
+          subtitle={`${formatPercentage(variancePercentage)} ${totalVariance >= 0 ? 'acima' : 'abaixo'} da meta`}
+          type="variance"
+          delay={0.3}
+        />
+        
+        <KpiCard title="Insights" value="" type="insight" delay={0.4}>
+          <div className="space-y-4">
+            <div className="flex items-start gap-3">
+              <ThumbsUp className="w-4 h-4 text-green-300" />
+              <div>
+                <p className="text-xs font-semibold text-white/90">Melhor: {bestSector?.setor || '-'}</p>
+                <p className="text-[10px] text-white/40">Status: {formatPercentage(bestSector?.status || 0)}</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-4 h-4 text-red-300" />
+              <div>
+                <p className="text-xs font-semibold text-white/90">Pior: {worstSector?.setor || '-'}</p>
+                <p className="text-[10px] text-white/40">Status: {formatPercentage(worstSector?.status || 0)}</p>
+              </div>
+            </div>
+          </div>
+        </KpiCard>
+      </div>
+
+      <div className="relative z-10">
+        <DepartmentTable data={data} onUpdate={handleUpdate} />
+      </div>
+    </div>
+  );
+}
+
