@@ -163,17 +163,38 @@ export default function App() {
   const handleShareScreenshot = async () => {
     if (!captureRef.current) return;
     setIsLoading(true);
-    triggerToast('Gerando imagem...');
+    triggerToast('Gerando imagem expansiva...');
     
     try {
-      const filterNodes = (node: HTMLElement) => {
-        return !node.classList?.contains('no-capture');
+      const node = captureRef.current;
+      
+      // Remove temporariamente o scroll horizontal da tabela para ela renderizar 100% visível na imagem
+      const scrollableElements = node.querySelectorAll('.overflow-x-auto') as NodeListOf<HTMLElement>;
+      scrollableElements.forEach(el => {
+        el.style.overflow = 'visible';
+      });
+
+      // Aguarda um pequeno instante para o DOM calcular os novos tamanhos expandidos
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      const filterNodes = (n: HTMLElement) => {
+        return !n.classList?.contains('no-capture');
       };
 
-      const blob = await toBlob(captureRef.current, {
+      const blob = await toBlob(node, {
         backgroundColor: '#020617', // slate-950
-        pixelRatio: 2,
+        pixelRatio: 2, // Maior resolução
+        width: node.scrollWidth,
+        height: node.scrollHeight,
         filter: filterNodes,
+        style: {
+          margin: '0',
+        }
+      });
+      
+      // Restaura o formato original da tabela (scroll mode)
+      scrollableElements.forEach(el => {
+        el.style.overflow = '';
       });
       
       if (!blob) {
