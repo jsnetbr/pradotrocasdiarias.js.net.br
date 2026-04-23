@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from './contexts/AuthContext';
-import { Calendar, RotateCcw, Camera, CheckCircle2, Loader2 } from 'lucide-react';
+import { Calendar, Camera, CheckCircle2, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toBlob } from 'html-to-image';
 import { KpiCard } from './components/KpiCard';
@@ -145,16 +145,6 @@ export default function App() {
     }
   };
 
-  const handleReset = async () => {
-    const batch = writeBatch(db);
-    data.forEach((item) => {
-      const docRef = doc(db, 'reports', currentDate, 'sectors', item.id);
-      batch.set(docRef, { id: item.id, realizado: 0, updatedAt: new Date().toISOString() }, { merge: true });
-    });
-    await batch.commit();
-    triggerToast('Valores zerados para este dia!');
-  };
-
   const triggerToast = (message: string) => {
     setShowToast(message);
     setTimeout(() => setShowToast(null), 3000);
@@ -284,15 +274,6 @@ export default function App() {
               className="bg-transparent border-none text-[10px] md:text-xs font-medium text-white/80 focus:ring-0 w-[90px] md:w-[100px] cursor-pointer outline-none [color-scheme:dark]"
             />
           </div>
-
-          <button 
-            onClick={handleReset}
-            disabled={isLoading}
-            className="bg-white/10 hover:bg-white/20 text-white rounded px-2.5 py-1 text-[10px] md:text-xs font-semibold flex items-center gap-1 shadow-sm transition-all active:scale-95 border border-white/10 backdrop-blur-md disabled:opacity-50"
-          >
-            <RotateCcw className="w-3 h-3" />
-            <span className="hidden sm:inline">Zerar</span>
-          </button>
 
           <button 
             onClick={handleShareScreenshot}
