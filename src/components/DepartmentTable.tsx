@@ -42,14 +42,15 @@ export const DepartmentTable: React.FC<DepartmentTableProps> = ({ data, onUpdate
               <th className="px-6 py-4 text-right">Meta</th>
               <th className="px-6 py-4 text-right">Diferença</th>
               <th className="px-6 py-4 text-right">Status</th>
-              <th className="px-6 py-4"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5">
             {data.map((item, index) => {
               const diff = item.realizado - item.meta;
               const isPositive = diff > 0;
-              const isHighStatus = item.status > 100;
+              // status > 0 means we are ABOVE the limit (Bad for Trocas)
+              const isAboveMeta = item.status > 0;
+              const isBelowMeta = item.status < 0;
 
               return (
                 <motion.tr
@@ -95,25 +96,20 @@ export const DepartmentTable: React.FC<DepartmentTableProps> = ({ data, onUpdate
                     </div>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-sm font-semibold tabular-nums min-w-[80px] justify-end ${
-                       isHighStatus ? 'bg-red-400/20 text-red-300' : 'bg-green-400/20 text-green-300'
-                    }`}>
-                      {formatPercentage(item.status)}
-                      {isHighStatus ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      {item.isCritical && (
-                         <span className="text-[10px] bg-red-400/30 text-red-200 px-2 py-0.5 rounded font-bold uppercase tracking-wider border border-red-400/50">
-                           Crítico
-                         </span>
-                      )}
-                      {item.isBest && (
-                         <span className="text-[10px] bg-green-400/30 text-green-200 px-2 py-0.5 rounded font-bold uppercase tracking-wider border border-green-400/50">
-                           Melhor
-                         </span>
-                      )}
+                    <div className={`inline-flex flex-col items-end gap-1 min-w-[100px]`}>
+                      <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-sm font-semibold tabular-nums ${
+                         isAboveMeta ? 'bg-red-400/20 text-red-300' : 
+                         isBelowMeta ? 'bg-green-400/20 text-green-300' : 
+                         'bg-white/10 text-white/40'
+                      }`}>
+                        {formatPercentage(Math.abs(item.status))}
+                        {isAboveMeta ? <ArrowUp className="w-3 h-3" /> : isBelowMeta ? <ArrowDown className="w-3 h-3" /> : null}
+                      </div>
+                      <span className={`text-[10px] uppercase font-bold tracking-wider ${
+                        isAboveMeta ? 'text-red-400/60' : isBelowMeta ? 'text-green-400/60' : 'text-white/20'
+                      }`}>
+                        {isAboveMeta ? 'acima' : isBelowMeta ? 'abaixo' : 'meta'}
+                      </span>
                     </div>
                   </td>
                 </motion.tr>

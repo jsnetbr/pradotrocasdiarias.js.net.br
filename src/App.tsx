@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from './contexts/AuthContext';
 import { Calendar, RotateCcw, Download, ThumbsUp, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { KpiCard } from './components/KpiCard';
@@ -9,24 +10,20 @@ import { collection, doc, onSnapshot, setDoc, writeBatch, query, getDocs } from 
 import { DepartmentData } from './types';
 
 export default function App() {
+  const { user, loading, signIn } = useAuth();
   const [data, setData] = useState<DepartmentData[]>([]);
   const [currentDate, setCurrentDate] = useState(new Date().toISOString().split('T')[0]);
   const [showToast, setShowToast] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(value);
-  };
-
-  const formatPercentage = (value: number) => {
-    return value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
-  };
-
-  // Dual Sync Effect: Master Metas + Daily Realizados
+  // Single Sync Effect: Handles auth-based data synchronization
   useEffect(() => {
+    if (!user) {
+      setIsLoading(false);
+      setData([]);
+      return;
+    }
+
     setIsLoading(true);
     
     // 1. References
@@ -44,7 +41,10 @@ export default function App() {
         
         const meta = master?.meta ?? base.meta;
         const realizado = daily?.realizado ?? 0;
-        const status = meta > 0 ? (realizado / meta) * 100 : 0;
+        
+        // Logical change: Status is now variation % from meta
+        // ((Realizado - Meta) / Meta) * 100
+        const status = meta > 0 ? ((realizado - meta) / meta) * 100 : 0;
         
         return {
           ...base,
@@ -84,7 +84,40 @@ export default function App() {
       unsubMaster();
       unsubDaily();
     };
-  }, [currentDate]);
+  }, [currentDate, user]);
+
+  if (loading) return <div className="min-h-screen flex items-center justify-center text-white">Carregando...</div>;
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 bg-slate-950">
+        <div className="glass w-full max-w-md p-8 rounded-3xl border border-white/10 shadow-2xl flex flex-col items-center text-center">
+          <div className="w-16 h-16 bg-gradient-to-br from-cyan-400 to-blue-500 rounded-2xl mb-6 shadow-lg shadow-cyan-500/20 flex items-center justify-center animate-pulse">
+            <CheckCircle2 className="w-8 h-8 text-white" />
+          </div>
+          <h1 className="text-2xl font-bold text-white mb-2">Acesso ao Relatório</h1>
+          <p className="text-white/60 mb-8 text-sm">Faça login para continuar</p>
+          <button 
+            onClick={signIn}
+            className="w-full bg-white hover:bg-white/90 text-slate-950 px-6 py-3 rounded-xl font-bold transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2"
+          >
+            Entrar com Google
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(value);
+  };
+
+  const formatPercentage = (value: number) => {
+    return value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
+  };
 
   const handleUpdate = async (id: string, updates: Partial<DepartmentData>) => {
     try {
@@ -158,8 +191,8 @@ export default function App() {
   const totalVariance = totalRealized - totalGoal;
   const variancePercentage = totalGoal > 0 ? (totalVariance / totalGoal) * 100 : 0;
 
-  const bestSector = data.length > 0 ? [...data].sort((a, b) => b.status - a.status)[0] : null;
-  const worstSector = data.length > 0 ? [...data].sort((a, b) => a.status - b.status)[0] : null;
+  const bestSector = data.length > 0 ? [...data].sort((a, b) => a.status - b.status)[0] : null;
+  const worstSector = data.length > 0 ? [...data].sort((a, b) => b.status - a.status)[0] : null;
 
   return (
     <div className="min-h-screen p-4 md:p-8 max-w-[1400px] mx-auto space-y-8 text-white relative">
@@ -182,7 +215,7 @@ export default function App() {
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-10 relative z-10">
         <div>
           <h1 className="text-3xl md:text-4xl font-bold text-white tracking-tight drop-shadow-sm">
-            Relatório de Troca Diário
+            Relatório de Trocas Diário
           </h1>
           {isLoading && (
             <div className="flex items-center gap-2 mt-2 text-white/40 text-xs text-cyan-400">
