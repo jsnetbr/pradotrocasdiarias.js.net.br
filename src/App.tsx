@@ -226,7 +226,7 @@ export default function App() {
   const worstSector = data.length > 0 ? [...data].sort((a, b) => b.status - a.status)[0] : null;
 
   return (
-    <div ref={captureRef} className="min-h-screen p-2 sm:p-4 md:p-6 max-w-[1200px] mx-auto space-y-4 md:space-y-6 text-white relative bg-slate-950">
+    <div ref={captureRef} className="min-h-screen p-1 sm:p-2 max-w-[1200px] mx-auto space-y-2 md:space-y-4 text-white relative bg-slate-950">
       <div className="bg-blur" />
       
       <AnimatePresence>
@@ -235,21 +235,21 @@ export default function App() {
             initial={{ opacity: 0, y: -50 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95 }}
-            className="fixed top-8 left-1/2 -translate-x-1/2 z-50 glass px-6 py-3 rounded-full flex items-center gap-3 border-white/20 shadow-2xl no-capture"
+            className="fixed top-4 left-1/2 -translate-x-1/2 z-50 glass px-4 py-2 rounded-full flex items-center gap-2 border-white/20 shadow-2xl no-capture"
           >
-            <CheckCircle2 className="w-5 h-5 text-green-400" />
-            <span className="text-sm font-medium">{showToast}</span>
+            <CheckCircle2 className="w-4 h-4 text-green-400" />
+            <span className="text-xs font-medium">{showToast}</span>
           </motion.div>
         )}
       </AnimatePresence>
       
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4 md:mb-6 relative z-10">
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-2 relative z-10 px-1 pt-1">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight drop-shadow-sm">
+          <h1 className="text-xl md:text-2xl font-bold text-white tracking-tight drop-shadow-sm">
             Relatório de Trocas Diário
           </h1>
           {isLoading && (
-            <div className="flex items-center gap-2 mt-1 text-white/40 text-[10px] md:text-xs text-cyan-400 no-capture">
+            <div className="flex items-center gap-1 mt-0.5 text-white/40 text-[9px] md:text-[10px] text-cyan-400 no-capture">
               <Loader2 className="w-3 h-3 animate-spin" />
               Sincronizando...
             </div>
@@ -257,37 +257,37 @@ export default function App() {
         </div>
         
         <div className="flex flex-wrap items-center gap-2 no-capture">
-          <div className="glass rounded-lg px-2 py-1.5 md:px-3 md:py-2 flex items-center gap-2 shadow-sm border-white/10 group cursor-pointer hover:bg-white/15 transition-colors relative">
-            <Calendar className="w-3.5 h-3.5 text-white/60 group-hover:text-white transition-colors pointer-events-none" />
+          <div className="glass rounded px-2 py-1 flex items-center gap-1.5 shadow-sm border-white/10 group cursor-pointer hover:bg-white/15 transition-colors relative">
+            <Calendar className="w-3 h-3 text-white/60 group-hover:text-white transition-colors pointer-events-none" />
             <input 
               type="date" 
               value={currentDate} 
               onChange={(e) => setCurrentDate(e.target.value)}
-              className="bg-transparent border-none text-xs md:text-sm font-medium text-white/80 focus:ring-0 w-[110px] md:w-32 cursor-pointer outline-none [color-scheme:dark]"
+              className="bg-transparent border-none text-[10px] md:text-xs font-medium text-white/80 focus:ring-0 w-[90px] md:w-[100px] cursor-pointer outline-none [color-scheme:dark]"
             />
           </div>
 
           <button 
             onClick={handleReset}
             disabled={isLoading}
-            className="bg-white/10 hover:bg-white/20 text-white rounded-lg px-3 py-1.5 md:px-4 md:py-2 text-xs md:text-sm font-semibold flex items-center gap-1.5 shadow-sm transition-all active:scale-95 border border-white/10 backdrop-blur-md disabled:opacity-50"
+            className="bg-white/10 hover:bg-white/20 text-white rounded px-2.5 py-1 text-[10px] md:text-xs font-semibold flex items-center gap-1 shadow-sm transition-all active:scale-95 border border-white/10 backdrop-blur-md disabled:opacity-50"
           >
-            <RotateCcw className="w-3.5 h-3.5" />
+            <RotateCcw className="w-3 h-3" />
             <span className="hidden sm:inline">Zerar</span>
           </button>
 
           <button 
             onClick={handleShareScreenshot}
             disabled={isLoading}
-            className="bg-[#25D366] hover:bg-[#20b858] text-white rounded-lg px-3 py-1.5 md:px-4 md:py-2 text-xs md:text-sm font-semibold flex items-center gap-1.5 shadow-sm transition-all active:scale-95 border border-white/20 backdrop-blur-md disabled:opacity-50"
+            className="bg-[#25D366] hover:bg-[#20b858] text-white rounded px-2.5 py-1 text-[10px] md:text-xs font-semibold flex items-center gap-1 shadow-sm transition-all active:scale-95 border border-white/20 backdrop-blur-md disabled:opacity-50"
           >
-            <Camera className="w-3.5 h-3.5" />
+            <Camera className="w-3 h-3" />
             Capturar
           </button>
         </div>
       </header>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 relative z-10">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 relative z-10 px-1">
         <KpiCard title="Total Realizado" value={formatCurrency(totalRealized)} delay={0.1} />
         <KpiCard title="Meta Total" value={formatCurrency(totalGoal)} delay={0.2} />
         <KpiCard 
@@ -299,19 +299,19 @@ export default function App() {
         />
         
         <KpiCard title="Insights" value="" type="insight" delay={0.4}>
-          <div className="space-y-2 mt-[-5px]">
-            <div className="flex items-start gap-2">
-              <ThumbsUp className="w-3 h-3 text-green-300 mt-1" />
+          <div className="space-y-1 mt-[-6px]">
+            <div className="flex items-start gap-1">
+              <ThumbsUp className="w-[10px] h-[10px] text-green-300 mt-0.5" />
               <div>
-                <p className="text-[11px] font-medium text-white/90">Melhor: {bestSector?.setor || '-'}</p>
-                <p className="text-[9px] text-white/40">Status: {formatPercentage(bestSector?.status || 0)}</p>
+                <p className="text-[9px] font-medium text-white/90 leading-none">Melhor: {bestSector?.setor || '-'}</p>
+                <p className="text-[8px] text-white/40 leading-none mt-0.5">St: {formatPercentage(bestSector?.status || 0)}</p>
               </div>
             </div>
-            <div className="flex items-start gap-2">
-              <AlertCircle className="w-3 h-3 text-red-300 mt-1" />
+            <div className="flex items-start gap-1">
+              <AlertCircle className="w-[10px] h-[10px] text-red-300 mt-0.5" />
               <div>
-                <p className="text-[11px] font-medium text-white/90">Pior: {worstSector?.setor || '-'}</p>
-                <p className="text-[9px] text-white/40">Status: {formatPercentage(worstSector?.status || 0)}</p>
+                <p className="text-[9px] font-medium text-white/90 leading-none">Pior: {worstSector?.setor || '-'}</p>
+                <p className="text-[8px] text-white/40 leading-none mt-0.5">St: {formatPercentage(worstSector?.status || 0)}</p>
               </div>
             </div>
           </div>
