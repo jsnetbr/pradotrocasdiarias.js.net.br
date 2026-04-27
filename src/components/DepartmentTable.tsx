@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { ArrowDown, ArrowUp, ThumbsUp, AlertCircle } from 'lucide-react';
+import { AlertCircle, ArrowDown, ArrowUp, ThumbsUp } from 'lucide-react';
 import { DepartmentData } from '../types';
 
 interface DepartmentTableProps {
@@ -21,8 +21,7 @@ export const DepartmentTable: React.FC<DepartmentTableProps> = ({ data, onUpdate
   };
 
   const handleInputChange = (id: string, field: keyof DepartmentData, value: string) => {
-    // Remove dots (thousand separators) and replace comma with dot (decimal separator)
-    const normalized = value.replace(/\./g, "").replace(",", ".");
+    const normalized = value.replace(/\./g, '').replace(',', '.');
     const numValue = parseFloat(normalized) || 0;
     onUpdate(id, { [field]: numValue });
   };
@@ -51,7 +50,6 @@ export const DepartmentTable: React.FC<DepartmentTableProps> = ({ data, onUpdate
             {data.map((item, index) => {
               const diff = item.realizado - item.meta;
               const isPositive = diff > 0;
-              // status > 0 means we are ABOVE the limit (Bad for Trocas)
               const isAboveMeta = item.status > 0;
               const isBelowMeta = item.status < 0;
               const isBest = item.id === bestSector?.id;
@@ -79,8 +77,8 @@ export const DepartmentTable: React.FC<DepartmentTableProps> = ({ data, onUpdate
                         type="text"
                         inputMode="decimal"
                         defaultValue={item.realizado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        onBlur={(e) => handleInputChange(item.id, 'realizado', e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                        onBlur={(event) => handleInputChange(item.id, 'realizado', event.target.value)}
+                        onKeyDown={(event) => event.key === 'Enter' && event.currentTarget.blur()}
                         className="bg-transparent border-b border-transparent hover:border-white/10 focus:border-cyan-400 outline-none text-right text-white/60 focus:text-white w-14 sm:w-20 px-0.5 py-0 transition-all text-[11px] md:text-xs"
                       />
                     </div>
@@ -92,13 +90,13 @@ export const DepartmentTable: React.FC<DepartmentTableProps> = ({ data, onUpdate
                         type="text"
                         inputMode="decimal"
                         defaultValue={item.meta.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        onBlur={(e) => handleInputChange(item.id, 'meta', e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                        onBlur={(event) => handleInputChange(item.id, 'meta', event.target.value)}
+                        onKeyDown={(event) => event.key === 'Enter' && event.currentTarget.blur()}
                         className="bg-transparent border-b border-transparent hover:border-white/10 focus:border-cyan-400 outline-none text-right text-white/60 focus:text-white w-14 sm:w-20 px-0.5 py-0 transition-all text-[11px] md:text-xs"
                       />
                     </div>
                   </td>
-                  <td className={`px-2 md:px-3 py-1.5 text-right tabular-nums font-medium`}>
+                  <td className="px-2 md:px-3 py-1.5 text-right tabular-nums font-medium">
                     <div className={`inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[10px] md:text-[11px] ${
                       isPositive ? 'bg-red-400/20 text-red-300' : 'bg-green-400/20 text-green-300'
                     }`}>
@@ -107,11 +105,11 @@ export const DepartmentTable: React.FC<DepartmentTableProps> = ({ data, onUpdate
                     </div>
                   </td>
                   <td className="px-2 md:px-3 py-1.5 text-right">
-                    <div className={`inline-flex flex-col items-end gap-0 min-w-[50px] md:min-w-[70px]`}>
+                    <div className="inline-flex flex-col items-end gap-0 min-w-[50px] md:min-w-[70px]">
                       <div className={`inline-flex items-center gap-0.5 px-1 py-px rounded text-[10px] md:text-[11px] font-semibold tabular-nums leading-none ${
-                         isAboveMeta ? 'bg-red-400/20 text-red-300' : 
-                         isBelowMeta ? 'bg-green-400/20 text-green-300' : 
-                         'bg-white/10 text-white/40'
+                        isAboveMeta ? 'bg-red-400/20 text-red-300' :
+                        isBelowMeta ? 'bg-green-400/20 text-green-300' :
+                        'bg-white/10 text-white/40'
                       }`}>
                         {formatPercentage(Math.abs(item.status))}
                         {isAboveMeta ? <ArrowUp className="w-2.5 h-2.5" /> : isBelowMeta ? <ArrowDown className="w-2.5 h-2.5" /> : null}

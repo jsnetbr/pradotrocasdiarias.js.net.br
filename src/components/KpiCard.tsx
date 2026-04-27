@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { TrendingUp, TrendingDown, ArrowUpRight } from 'lucide-react';
+import { ArrowUpRight } from 'lucide-react';
 
 interface KpiCardProps {
   title: string;
@@ -27,7 +27,7 @@ export const KpiCard: React.FC<KpiCardProps> = ({ title, value, subtitle, type =
       
       <div className="flex items-baseline gap-1 mb-1">
         <span className={`text-lg md:text-xl font-bold ${
-          type === 'variance' ? (isPositive ? 'text-green-400' : 'text-red-400') : 'text-white'
+          type === 'variance' ? (isPositive ? 'text-red-400' : 'text-green-400') : 'text-white'
         }`}>
           {value}
         </span>

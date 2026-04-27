@@ -1,13 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useAuth } from './contexts/AuthContext';
-import { Calendar, Camera, CheckCircle2, Loader2 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { AlertCircle, Calendar, Camera, CheckCircle2, Loader2 } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
 import { toBlob } from 'html-to-image';
 import { KpiCard } from './components/KpiCard';
 import { DepartmentTable } from './components/DepartmentTable';
 import { departmentData as initialData } from './data';
 import { db } from './lib/firebase';
-import { collection, doc, onSnapshot, setDoc, writeBatch, query, getDocs } from 'firebase/firestore';
+import { collection, doc, onSnapshot, setDoc, writeBatch } from 'firebase/firestore';
 import { DepartmentData } from './types';
 
 export default function App() {
@@ -15,72 +15,82 @@ export default function App() {
   const [data, setData] = useState<DepartmentData[]>([]);
   const [currentDate, setCurrentDate] = useState(new Date().toISOString().split('T')[0]);
   const [showToast, setShowToast] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const captureRef = useRef<HTMLDivElement>(null);
 
-  // Single Sync Effect: Handles auth-based data synchronization
   useEffect(() => {
     if (!user) {
       setIsLoading(false);
       setData([]);
+      setErrorMessage(null);
       return;
     }
 
     setIsLoading(true);
-    
-    // 1. References
+    setErrorMessage(null);
+
     const masterSectorsRef = collection(db, 'config', 'master_sectors', 'sectors');
     const dailySectorsRef = collection(db, 'reports', currentDate, 'sectors');
 
     let masterList: any[] = [];
     let dailyList: any[] = [];
 
+    const handleSyncError = (error: unknown) => {
+      console.error('Erro ao sincronizar:', error);
+      setErrorMessage('Não foi possível carregar os dados. Confira sua conexão e as regras do Firebase.');
+      setIsLoading(false);
+    };
+
     const combineData = () => {
-      // Use initialData as the skeleton for names and IDs
-      const combined = initialData.map(base => {
-        const master = masterList.find(m => m.id === base.id);
-        const daily = dailyList.find(d => d.id === base.id);
-        
+      const combined = initialData.map((base) => {
+        const master = masterList.find((item) => item.id === base.id);
+        const daily = dailyList.find((item) => item.id === base.id);
+
         const meta = master?.meta ?? base.meta;
         const realizado = daily?.realizado ?? 0;
-        
-        // Logical change: Status is now variation % from meta
-        // ((Realizado - Meta) / Meta) * 100
         const status = meta > 0 ? ((realizado - meta) / meta) * 100 : 0;
-        
+
         return {
           ...base,
           meta,
           realizado,
           status,
-          updatedAt: daily?.updatedAt || master?.updatedAt || new Date().toISOString()
+          updatedAt: daily?.updatedAt || master?.updatedAt || new Date().toISOString(),
         };
       });
+
       setData(combined);
       setIsLoading(false);
     };
 
-    // 2. Listen to Master Metas
-    const unsubMaster = onSnapshot(masterSectorsRef, (snapshot) => {
-      if (snapshot.empty) {
-        // First time initialization of Master Metas
-        const batch = writeBatch(db);
-        initialData.forEach(item => {
-          const docRef = doc(masterSectorsRef, item.id);
-          batch.set(docRef, { id: item.id, setor: item.setor, meta: item.meta });
-        });
-        batch.commit();
-      } else {
-        masterList = snapshot.docs.map(doc => doc.data());
-        combineData();
-      }
-    });
+    const unsubMaster = onSnapshot(
+      masterSectorsRef,
+      (snapshot) => {
+        if (snapshot.empty) {
+          const batch = writeBatch(db);
+          initialData.forEach((item) => {
+            const docRef = doc(masterSectorsRef, item.id);
+            batch.set(docRef, { id: item.id, setor: item.setor, meta: item.meta });
+          });
+          batch.commit().catch(handleSyncError);
+          return;
+        }
 
-    // 3. Listen to Daily Realizados
-    const unsubDaily = onSnapshot(dailySectorsRef, (snapshot) => {
-      dailyList = snapshot.docs.map(doc => doc.data());
-      combineData();
-    });
+        masterList = snapshot.docs.map((item) => item.data());
+        combineData();
+      },
+      handleSyncError,
+    );
+
+    const unsubDaily = onSnapshot(
+      dailySectorsRef,
+      (snapshot) => {
+        dailyList = snapshot.docs.map((item) => item.data());
+        combineData();
+      },
+      handleSyncError,
+    );
 
     return () => {
       unsubMaster();
@@ -88,7 +98,9 @@ export default function App() {
     };
   }, [currentDate, user]);
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center text-white">Carregando...</div>;
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center text-white">Carregando...</div>;
+  }
 
   if (!user) {
     return (
@@ -99,7 +111,7 @@ export default function App() {
           </div>
           <h1 className="text-2xl font-bold text-white mb-2">Acesso ao Relatório</h1>
           <p className="text-white/60 mb-8 text-sm">Faça login para continuar</p>
-          <button 
+          <button
             onClick={signIn}
             className="w-full bg-white hover:bg-white/90 text-slate-950 px-6 py-3 rounded-xl font-bold transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2"
           >
@@ -121,81 +133,75 @@ export default function App() {
     return value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
   };
 
-  const handleUpdate = async (id: string, updates: Partial<DepartmentData>) => {
-    try {
-      if (updates.meta !== undefined) {
-        // Update Global Meta
-        const masterDocRef = doc(db, 'config', 'master_sectors', 'sectors', id);
-        await setDoc(masterDocRef, { meta: updates.meta }, { merge: true });
-      }
-      
-      if (updates.realizado !== undefined) {
-        // Update Daily Realizado
-        const dailyDocRef = doc(db, 'reports', currentDate, 'sectors', id);
-        await setDoc(dailyDocRef, { 
-          id, 
-          realizado: updates.realizado, 
-          updatedAt: new Date().toISOString() 
-        }, { merge: true });
-      }
-      
-      triggerToast('Dados sincronizados!');
-    } catch (error) {
-      console.error("Erro ao salvar:", error);
-    }
-  };
-
   const triggerToast = (message: string) => {
     setShowToast(message);
     setTimeout(() => setShowToast(null), 3000);
   };
 
+  const handleUpdate = async (id: string, updates: Partial<DepartmentData>) => {
+    try {
+      setErrorMessage(null);
+
+      if (updates.meta !== undefined) {
+        const masterDocRef = doc(db, 'config', 'master_sectors', 'sectors', id);
+        await setDoc(masterDocRef, { meta: updates.meta }, { merge: true });
+      }
+
+      if (updates.realizado !== undefined) {
+        const dailyDocRef = doc(db, 'reports', currentDate, 'sectors', id);
+        await setDoc(
+          dailyDocRef,
+          {
+            id,
+            realizado: updates.realizado,
+            updatedAt: new Date().toISOString(),
+          },
+          { merge: true },
+        );
+      }
+
+      triggerToast('Dados sincronizados!');
+    } catch (error) {
+      console.error('Erro ao salvar:', error);
+      setErrorMessage('Não foi possível salvar. Confira sua conexão e tente de novo.');
+      triggerToast('Erro ao salvar.');
+    }
+  };
+
   const handleShareScreenshot = async () => {
     if (!captureRef.current) return;
+
     setIsLoading(true);
-    triggerToast('Gerando imagem expansiva...');
-    
+    triggerToast('Gerando imagem...');
+
+    const node = captureRef.current;
+    const scrollableElements = node.querySelectorAll('.overflow-x-auto') as NodeListOf<HTMLElement>;
+
     try {
-      const node = captureRef.current;
-      
-      // Remove temporariamente o scroll horizontal da tabela para ela renderizar 100% visível na imagem
-      const scrollableElements = node.querySelectorAll('.overflow-x-auto') as NodeListOf<HTMLElement>;
-      scrollableElements.forEach(el => {
-        el.style.overflow = 'visible';
+      scrollableElements.forEach((element) => {
+        element.style.overflow = 'visible';
       });
 
-      // Aguarda um pequeno instante para o DOM calcular os novos tamanhos expandidos
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      const filterNodes = (n: HTMLElement) => {
-        return !n.classList?.contains('no-capture');
-      };
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       const blob = await toBlob(node, {
-        backgroundColor: '#020617', // slate-950
-        pixelRatio: 2, // Maior resolução
+        backgroundColor: '#020617',
+        pixelRatio: 2,
         width: node.scrollWidth,
         height: node.scrollHeight,
-        filter: filterNodes,
+        filter: (element) => !element.classList?.contains('no-capture'),
         style: {
           margin: '0',
-        }
+        },
       });
-      
-      // Restaura o formato original da tabela (scroll mode)
-      scrollableElements.forEach(el => {
-        el.style.overflow = '';
-      });
-      
+
       if (!blob) {
         triggerToast('Erro ao gerar imagem.');
-        setIsLoading(false);
         return;
       }
 
       const file = new File([blob], `relatorio_trocas_${currentDate}.png`, { type: 'image/png' });
 
-      // Tenta usar a Web Share API (Natividade no mobile para WhatsApp)
       if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
         try {
           await navigator.share({
@@ -204,11 +210,10 @@ export default function App() {
             text: `Relatório do dia ${currentDate}`,
           });
           triggerToast('Compartilhado com sucesso!');
-        } catch (e) {
-          console.log('Compartilhamento cancelado', e);
+        } catch (error) {
+          console.log('Compartilhamento cancelado', error);
         }
       } else {
-        // Fallback para download na web onde o share nativo não funciona
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
@@ -219,15 +224,17 @@ export default function App() {
         URL.revokeObjectURL(url);
         triggerToast('Imagem salva para enviar pelo WhatsApp!');
       }
-      setIsLoading(false);
-    } catch (err) {
-      console.error(err);
+    } catch (error) {
+      console.error(error);
       triggerToast('Erro ao capturar tela.');
+    } finally {
+      scrollableElements.forEach((element) => {
+        element.style.overflow = '';
+      });
       setIsLoading(false);
     }
   };
 
-  // Calculate totals
   const totalRealized = data.reduce((acc, curr) => acc + curr.realizado, 0);
   const totalGoal = data.reduce((acc, curr) => acc + curr.meta, 0);
   const totalVariance = totalRealized - totalGoal;
@@ -236,7 +243,7 @@ export default function App() {
   return (
     <div ref={captureRef} className="min-h-screen p-1 sm:p-2 max-w-[1200px] mx-auto space-y-2 md:space-y-4 text-white relative bg-slate-950">
       <div className="bg-blur" />
-      
+
       <AnimatePresence>
         {showToast && (
           <motion.div
@@ -250,32 +257,32 @@ export default function App() {
           </motion.div>
         )}
       </AnimatePresence>
-      
+
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-2 relative z-10 px-1 pt-1">
         <div>
           <h1 className="text-xl md:text-2xl font-bold text-white tracking-tight drop-shadow-sm">
             Relatório de Trocas Diário
           </h1>
           {isLoading && (
-            <div className="flex items-center gap-1 mt-0.5 text-white/40 text-[9px] md:text-[10px] text-cyan-400 no-capture">
+            <div className="flex items-center gap-1 mt-0.5 text-[9px] md:text-[10px] text-cyan-400 no-capture">
               <Loader2 className="w-3 h-3 animate-spin" />
               Sincronizando...
             </div>
           )}
         </div>
-        
+
         <div className="flex flex-wrap items-center gap-2 no-capture">
           <div className="glass rounded px-2 py-1 flex items-center gap-1.5 shadow-sm border-white/10 group cursor-pointer hover:bg-white/15 transition-colors relative">
             <Calendar className="w-3 h-3 text-white/60 group-hover:text-white transition-colors pointer-events-none" />
-            <input 
-              type="date" 
-              value={currentDate} 
-              onChange={(e) => setCurrentDate(e.target.value)}
+            <input
+              type="date"
+              value={currentDate}
+              onChange={(event) => setCurrentDate(event.target.value)}
               className="bg-transparent border-none text-[10px] md:text-xs font-medium text-white/80 focus:ring-0 w-[90px] md:w-[100px] cursor-pointer outline-none [color-scheme:dark]"
             />
           </div>
 
-          <button 
+          <button
             onClick={handleShareScreenshot}
             disabled={isLoading}
             className="bg-[#25D366] hover:bg-[#20b858] text-white rounded px-2.5 py-1 text-[10px] md:text-xs font-semibold flex items-center gap-1 shadow-sm transition-all active:scale-95 border border-white/20 backdrop-blur-md disabled:opacity-50"
@@ -286,13 +293,20 @@ export default function App() {
         </div>
       </header>
 
+      {errorMessage && (
+        <div className="mx-1 relative z-10 no-capture glass rounded-xl px-3 py-2 flex items-center gap-2 text-xs text-red-200 border-red-400/30">
+          <AlertCircle className="w-4 h-4 text-red-300 shrink-0" />
+          <span>{errorMessage}</span>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 relative z-10 px-1">
         <KpiCard title="Total Realizado" value={formatCurrency(totalRealized)} delay={0.1} />
         <KpiCard title="Meta Total" value={formatCurrency(totalGoal)} delay={0.2} />
-        <KpiCard 
-          title="Variação Total" 
-          value={formatCurrency(totalVariance)} 
-          subtitle={`${formatPercentage(variancePercentage)} ${totalVariance >= 0 ? 'acima' : 'abaixo'} da meta`}
+        <KpiCard
+          title="Variação Total"
+          value={formatCurrency(totalVariance)}
+          subtitle={`${formatPercentage(Math.abs(variancePercentage))} ${totalVariance >= 0 ? 'acima' : 'abaixo'} da meta`}
           type="variance"
           delay={0.3}
         />
@@ -304,4 +318,3 @@ export default function App() {
     </div>
   );
 }
-

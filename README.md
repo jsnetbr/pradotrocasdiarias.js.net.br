@@ -1,20 +1,24 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Trocas JS Net BR
 
-# Run and deploy your AI Studio app
+Aplicativo para acompanhar o relatório diário de trocas por departamento.
 
-This contains everything you need to run your app locally.
+## Como rodar
 
-View your app in AI Studio: https://ai.studio/apps/3f03a20e-c38a-43b5-b913-a0b1b898c95b
-
-## Run Locally
-
-**Prerequisites:**  Node.js
-
-
-1. Install dependencies:
+1. Instale as dependências:
    `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
+2. Abra o app local:
    `npm run dev`
+3. Gere a versão final:
+   `npm run build`
+
+## Firebase
+
+Este projeto usa Firebase Authentication com login Google e Firestore para salvar os dados.
+
+Antes de usar com dados reais:
+
+1. Ative o login Google no Firebase Authentication.
+2. Adicione o domínio do site nos domínios autorizados do Firebase.
+3. Publique o arquivo `firestore.rules` no Firestore.
+
+As regras atuais exigem login para ver e alterar os relatórios.
